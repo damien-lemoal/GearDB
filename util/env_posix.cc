@@ -88,10 +88,8 @@ class HMRamdomAccessFile : public RandomAccessFile {  //hm read file
       Status s;
       ssize_t r = -1;
       r = hm_manager_->hm_read(filenum, scratch, n, offset);
-      if(r<0){
-        s = PosixError(filename_, errno);
-        return s;
-      }
+      if(r<0)
+        return PosixError(filename_, errno);
       *result = Slice(scratch, (r < 0) ? 0 : r);
       return s;
     }
@@ -190,11 +188,11 @@ class HMWritableFile : public WritableFile {    //hm write file except L0 level
       return Status::OK();
     }
 
-    virtual Status Sync() { 
+    virtual Status Sync() {
       ssize_t ret = hm_manager_->hm_write(level_,Parsefname(fname_), buf_, total_size_);
-      if(ret>0){
-          return Status::OK();
-      }
+      if (ret < 0)
+	return PosixError(fname_, errno);
+      return Status::OK();
     }
 
     virtual Status Setlevel(int level = 0) { return Status::OK(); }
@@ -207,7 +205,7 @@ class HMWritableFileL0 : public WritableFile {    //hm write L0 level file
     HMManager* hm_manager_;
     std::string fname_;
     int level_;
-    char* buf_; 
+    char* buf_;
     uint64_t total_size_;
 
   public:
@@ -217,7 +215,6 @@ class HMWritableFileL0 : public WritableFile {    //hm write L0 level file
       if(level_ == -1){
         printf("ldb file have error level!table:%ld\n",Parsefname(fname_));
       }
-      //buf_ = new char[Options().write_buffer_size + 1*1024*1024];
       uint64_t size=(Options().write_buffer_size + 1*1024*1024);
       int ret=posix_memalign((void **)&buf_,MEMALIGN_SIZE,size);
       if(ret!=0){
@@ -245,11 +242,11 @@ class HMWritableFileL0 : public WritableFile {    //hm write L0 level file
       return Status::OK();
     }
 
-    virtual Status Sync() { 
+    virtual Status Sync() {
       ssize_t ret = hm_manager_->hm_write(level_,Parsefname(fname_), buf_, total_size_);
-      if(ret>0){
-          return Status::OK();
-      }
+      if (ret < 0)
+	return PosixError(fname_, errno);
+      return Status::OK();
     }
 
     virtual Status Setlevel(int level = 0){
@@ -257,7 +254,7 @@ class HMWritableFileL0 : public WritableFile {    //hm write L0 level file
       return Status::OK();
     }
 
-    virtual const char* Getbuf() { return buf_; }
+    virtual const char *Getbuf() { return buf_; }
 
 };
 
