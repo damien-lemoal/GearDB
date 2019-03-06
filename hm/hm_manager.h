@@ -26,6 +26,11 @@ namespace leveldb{
 		HMManager(const Comparator *icmp);
 		~HMManager();
 
+		bool hm_ok()
+		{
+			return initialized;
+		};
+
 		// Write a SSTable file to a level
 		ssize_t hm_write(int level, uint64_t filenum,
 				 const void *buf, uint64_t count);
@@ -81,6 +86,7 @@ namespace leveldb{
 		struct zbc_zone  *zone_;
 		unsigned int zonenum_;
 		unsigned int first_zonenum_;
+		bool initialized;
 
 		const InternalKeyComparator icmp_;
 

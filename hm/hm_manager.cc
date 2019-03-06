@@ -22,26 +22,31 @@ namespace leveldb{
 
 	HMManager::HMManager(const Comparator *icmp) :icmp_(icmp)
 	{
-		ssize_t ret;
+		int ret;
+
+		initialized = false;
 
 		// Open device with O_DIRECT
 		ret = zbc_open(smr_filename, O_RDWR | O_DIRECT, &dev_);
 		if (ret != 0) {
-			printf("error:%ld open failed!\n", ret);
-			return ;
+			printf("Open %s failed %d (%s)\n",
+			       smr_filename, ret, strerror(-ret));
+			return;
 		}
 
 		// Reset all zones
-		ret = zbc_reset_zone(dev_, 0, 1);
+		ret = zbc_reset_zone(dev_, 0, ZBC_OP_ALL_ZONES);
 		if (ret != 0) {
-			printf("error:%ld reset failed!\n", ret);
-			return ;
+			printf("error:%ld reset failed %d (%s)\n",
+			       ret, strerror(-ret));
+			return;
 		}
 
 		// Get zone information
 		ret = zbc_list_zones(dev_, 0, ZBC_RO_ALL, &zone_, &zonenum_);
 		if (ret != 0) {
-			printf("error:%zd zbc_list_zones failed!\n", ret);
+			printf("zbc_list_zones failed %d (%s)\n",
+			       ret, strerror(-ret));
 			return;
 		}
 
@@ -71,26 +76,30 @@ namespace leveldb{
 		move_file_size = 0;
 		read_time = 0;
 		write_time = 0;
+
+		initialized = true;
 	}
 
 	HMManager::~HMManager()
 	{
-		get_all_info();
+		if (initialized) {
+			get_all_info();
 
-		std::map<uint64_t, struct Ldbfile*>::iterator it=table_map_.begin();
-		while (it != table_map_.end()){
-			delete it->second;
-			it = table_map_.erase(it);
-		}
-		table_map_.clear();
-
-		for (int i = 0; i < config::kNumLevels; i++) {
-			std::vector<struct Zonefile*>::iterator iz=zone_info_[i].begin();
-			while (iz != zone_info_[i].end()) {
-				delete (*iz);
-				iz = zone_info_[i].erase(iz);
+			std::map<uint64_t, struct Ldbfile*>::iterator it=table_map_.begin();
+			while (it != table_map_.end()){
+				delete it->second;
+				it = table_map_.erase(it);
 			}
-			zone_info_[i].clear();
+			table_map_.clear();
+
+			for (int i = 0; i < config::kNumLevels; i++) {
+				std::vector<struct Zonefile*>::iterator iz=zone_info_[i].begin();
+				while (iz != zone_info_[i].end()) {
+					delete (*iz);
+					iz = zone_info_[i].erase(iz);
+				}
+				zone_info_[i].clear();
+			}
 		}
 
 		if (dev_)
