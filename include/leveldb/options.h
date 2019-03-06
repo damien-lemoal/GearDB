@@ -154,6 +154,12 @@ struct LEVELDB_EXPORT Options {
   // Default: NULL
   const FilterPolicy* filter_policy;
 
+  // If non-NULL, use the specified disk device as backend storage in place
+  // of regular files.
+  //
+  // Default: NULL
+  const char* disk_path;
+
   // Create an Options object with default values for all fields.
   Options();
 };

@@ -26,10 +26,8 @@ namespace leveldb{
 		HMManager(const Comparator *icmp);
 		~HMManager();
 
-		bool hm_ok()
-		{
-			return initialized;
-		};
+		// Open a disk
+		int hm_open(const char *disk_path);
 
 		// Write a SSTable file to a level
 		ssize_t hm_write(int level, uint64_t filenum,
@@ -76,17 +74,16 @@ namespace leveldb{
 		void get_valid_info();
 		void get_all_info();
 		void get_valid_data();
-		void get_my_info(int num);
+		void get_info(int num);
 		void get_valid_all_data(int num);
 
 	private:
-		BitMap *bitmap_;
-
+		const char *disk_path_;
 		struct zbc_device *dev_;
 		struct zbc_zone  *zone_;
+		BitMap *bitmap_;
 		unsigned int zonenum_;
 		unsigned int first_zonenum_;
-		bool initialized;
 
 		const InternalKeyComparator icmp_;
 

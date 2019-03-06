@@ -9,12 +9,8 @@ namespace leveldb{
 	Singleton::~Singleton() {}
 
 	HMManager* Singleton::Gethmmanager() {
-		if (!hm_manager_)
+		if (hm_manager_ == NULL)
 			hm_manager_ = new HMManager(Options().comparator);
-		if (!hm_manager_->hm_ok()) {
-			fprintf(stderr, "Failed to initialize a new hm_manager\n");
-			exit(1);
-		}
 		return hm_manager_;
 	}
 

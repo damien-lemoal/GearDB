@@ -22,50 +22,16 @@ namespace leveldb{
 
 	HMManager::HMManager(const Comparator *icmp) :icmp_(icmp)
 	{
-		int ret;
+		// Private members
+		disk_path_ = NULL;
+		dev_ = NULL;
+		zone_ = NULL;
+		bitmap_ = NULL;
+		zonenum_ = 0;
+		first_zonenum_ = 0;
 
-		initialized = false;
-
-		// Open device with O_DIRECT
-		ret = zbc_open(smr_filename, O_RDWR | O_DIRECT, &dev_);
-		if (ret != 0) {
-			printf("Open %s failed %d (%s)\n",
-			       smr_filename, ret, strerror(-ret));
-			return;
-		}
-
-		// Reset all zones
-		ret = zbc_reset_zone(dev_, 0, ZBC_OP_ALL_ZONES);
-		if (ret != 0) {
-			printf("error:%ld reset failed %d (%s)\n",
-			       ret, strerror(-ret));
-			return;
-		}
-
-		// Get zone information
-		ret = zbc_list_zones(dev_, 0, ZBC_RO_ALL, &zone_, &zonenum_);
-		if (ret != 0) {
-			printf("zbc_list_zones failed %d (%s)\n",
-			       ret, strerror(-ret));
-			return;
-		}
-
-		printf("Device %s: %u zones found\n",
-		       smr_filename, zonenum_);
-
-		bitmap_ = new BitMap(zonenum_);
-		first_zonenum_ = set_first_zonenum();
-		if (first_zonenum_ == (unsigned int)-1) {
-			printf("First sequential zone not found\n");
-			return;
-		}
-
+		// Logging
 		init_log_file();
-		MyLog("\n  !!geardb!!  \n");
-		MyLog("COM_WINDOW_SEQ:%d Verify_Table:%d Read_Whole_Table:%d Find_Table_Old:%d\n",
-		      COM_WINDOW_SEQ, Verify_Table, Read_Whole_Table, Find_Table_Old);
-		MyLog("the first_zonenum_:%u zone_num:%u\n",
-		      first_zonenum_, zonenum_);
 
 		// Statistics
 		delete_zone_num = 0;
@@ -76,13 +42,11 @@ namespace leveldb{
 		move_file_size = 0;
 		read_time = 0;
 		write_time = 0;
-
-		initialized = true;
 	}
 
 	HMManager::~HMManager()
 	{
-		if (initialized) {
+		if (dev_) {
 			get_all_info();
 
 			std::map<uint64_t, struct Ldbfile*>::iterator it=table_map_.begin();
@@ -100,13 +64,73 @@ namespace leveldb{
 				}
 				zone_info_[i].clear();
 			}
+
+			zbc_close(dev_);
 		}
 
+		free(zone_);
+		free(bitmap_);
+	}
+
+	int HMManager::hm_open(const char *disk_path)
+	{
+		int ret;
+
 		if (dev_)
+			return 0;
+
+		disk_path_ = disk_path;
+
+		// Open device with O_DIRECT
+		ret = zbc_open(disk_path_, O_RDWR | O_DIRECT, &dev_);
+		if (ret != 0) {
+			printf("Open %s failed %d (%s)\n",
+			       disk_path_, ret, strerror(-ret));
+			goto err;
+		}
+
+		// Reset all zones
+		ret = zbc_reset_zone(dev_, 0, ZBC_OP_ALL_ZONES);
+		if (ret != 0) {
+			printf("error:%ld reset failed %d (%s)\n",
+			       ret, strerror(-ret));
+			goto err;
+		}
+
+		// Get zone information
+		ret = zbc_list_zones(dev_, 0, ZBC_RO_ALL, &zone_, &zonenum_);
+		if (ret != 0) {
+			printf("zbc_list_zones failed %d (%s)\n",
+			       ret, strerror(-ret));
+			goto err;
+		}
+
+		printf("Device %s: %u zones found\n",
+		       disk_path_, zonenum_);
+
+		bitmap_ = new BitMap(zonenum_);
+		first_zonenum_ = set_first_zonenum();
+		if (first_zonenum_ == (unsigned int)-1) {
+			printf("First sequential zone not found\n");
+			goto err;
+		}
+
+		MyLog("\n  !!geardb!!  \n");
+		MyLog("COM_WINDOW_SEQ:%d Verify_Table:%d Read_Whole_Table:%d Find_Table_Old:%d\n",
+		      COM_WINDOW_SEQ, Verify_Table, Read_Whole_Table, Find_Table_Old);
+		MyLog("the first_zonenum_:%u zone_num:%u\n",
+		      first_zonenum_, zonenum_);
+
+		return 0;
+err:
+		if (dev_) {
 			zbc_close(dev_);
+			dev_ = NULL;
+		}
 		free(zone_);
 		free(bitmap_);
 
+		return -ret;
 	}
 
 	unsigned int HMManager::set_first_zonenum()
@@ -692,7 +716,7 @@ namespace leveldb{
 		}
 	}
 
-	void HMManager::get_my_info(int num)
+	void HMManager::get_info(int num)
 	{
 		MyLog6("\nnum:%d table_size:%ld MB kv_read_sector:%ld MB kv_store_sector:%ld MB zone_num:%ld max_zone_num:%ld move_size:%ld MB\n",num,all_table_size/(1024*1024),\
 		       kv_read_sector/2048,kv_store_sector/2048,get_zone_num(),max_zone_num,move_file_size/(1024*1024));

@@ -147,7 +147,8 @@ DBImpl::DBImpl(const Options& raw_options, const std::string& dbname)
       tmp_batch_(new WriteBatch),
       bg_compaction_scheduled_(false),
       manual_compaction_(NULL),
-      hm_manager_(Singleton::Gethmmanager()) {
+      hm_manager_(Singleton::Gethmmanager())
+{
   has_imm_.Release_Store(NULL);
 //////
   log_write_time_ = 0;
@@ -217,6 +218,7 @@ bool DBImpl::need_compaction(){
   }
   return true;
 }
+
 //////
 
 Status DBImpl::NewDB() {
@@ -2088,6 +2090,12 @@ Status DB::Open(const Options& options, const std::string& dbname,
   DBImpl* impl = new DBImpl(options, dbname);
   impl->mutex_.Lock();
   VersionEdit edit;
+
+  // Open disk if one is specified
+  int ret = impl->hm_manager_->hm_open(options.disk_path);
+  if (ret != 0)
+    return Status::InvalidArgument("Open disk failed:", strerror(ret));
+
   // Recover handles create_if_missing, error_if_exists
   bool save_manifest = false;
   Status s = impl->Recover(&edit, &save_manifest);

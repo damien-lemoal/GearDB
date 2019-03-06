@@ -137,6 +137,9 @@ static bool FLAGS_reuse_logs = false;
 // Use the db with the following name.
 static const char* FLAGS_db = NULL;
 
+// Use the backend disk with the following access path
+static const char* FLAGS_disk = NULL;
+
 namespace leveldb {
 
 namespace {
@@ -349,8 +352,6 @@ class Benchmark {
   int reads_;
   int heap_counter_;
 
-  HMManager *hm_manager_;
-
   void PrintHeader() {
     const int kKeySize = 16;
     PrintEnvironment();
@@ -436,8 +437,7 @@ class Benchmark {
     value_size_(FLAGS_value_size),
     entries_per_batch_(1),
     reads_(FLAGS_reads < 0 ? FLAGS_num : FLAGS_reads),
-    heap_counter_(0),
-    hm_manager_(Singleton::Gethmmanager()) {
+    heap_counter_(0) {
     std::vector<std::string> files;
     g_env->GetChildren(FLAGS_db, &files);
     for (size_t i = 0; i < files.size(); i++) {
@@ -749,6 +749,7 @@ class Benchmark {
     options.max_open_files = FLAGS_open_files;
     options.filter_policy = filter_policy_;
     options.reuse_logs = FLAGS_reuse_logs;
+    options.disk_path = FLAGS_disk;
     Status s = DB::Open(options, FLAGS_db, &db_);
     if (!s.ok()) {
       fprintf(stderr, "open error: %s\n", s.ToString().c_str());
@@ -812,13 +813,13 @@ class Benchmark {
         MyLog5("i=%d, every 250000 ops(1G), speed=%2.1lfMB/s time=%.2f s run_time:%.2f s size:%.2f MB\n", i+1, (ebytes / 1048576.0) / elapsed,elapsed,mytime,bytes/1048576.0);
         std::string status;
         db_->GetProperty("leveldb.stats",&status);
-        hm_manager_->get_my_info(i+1);
+        Singleton::Gethmmanager()->get_info(i+1);
         MyLog6("%s",status.c_str());
         double log_time = db_->get_log_write_time();
         MyLog6("\nLog write time:%.2f s\n",log_time * 1e-6);
       }
     }
-    hm_manager_->get_all_info();
+    Singleton::Gethmmanager()->get_all_info();
 
     thread->stats.AddBytes(bytes);
   }
@@ -1057,6 +1058,8 @@ int main(int argc, char** argv) {
       FLAGS_open_files = n;
     } else if (strncmp(argv[i], "--db=", 5) == 0) {
       FLAGS_db = argv[i] + 5;
+    } else if (strncmp(argv[i], "--disk=", 7) == 0) {
+      FLAGS_disk = argv[i] + 7;
     } else {
       fprintf(stderr, "Invalid flag '%s'\n", argv[i]);
       exit(1);
@@ -1064,6 +1067,11 @@ int main(int argc, char** argv) {
   }
 
   leveldb::g_env = leveldb::Env::Default();
+
+  if (FLAGS_disk == NULL) {
+      printf("A disk must be specified with \"--disk=/path/to/smr/disk\"\n");
+      return 1;
+  }
 
   // Choose a location for the test database if none given with --db=<path>
   if (FLAGS_db == NULL) {

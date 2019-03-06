@@ -190,13 +190,10 @@ class DBImpl : public DB {
   // Have we encountered a background error in paranoid mode?
   Status bg_error_;
 
-  //////added by lzw
-    HMManager *hm_manager_;
-
-    double log_write_time_;
-    int64_t compaction_num_;
-  //////end
-
+  // GearDB
+  HMManager* hm_manager_;
+  double log_write_time_;
+  int64_t compaction_num_;
 
   // Per level compaction stats.  stats_[level] stores the stats for
   // compactions that produced data for the specified "level".

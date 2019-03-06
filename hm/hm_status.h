@@ -25,8 +25,6 @@
 
 namespace leveldb {
 
-	static const char smr_filename[]="/dev/dm-0";   //e.g. smr_filename[]="/dev/sdb1";
-
 	struct Ldbfile {     //file = SSTable ,file Metadata struct
 		uint64_t table;  //file name = fiel serial number
 		uint64_t zone;   //file's zone number
